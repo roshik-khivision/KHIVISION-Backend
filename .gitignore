@@ -14,7 +14,10 @@ yarn-error.log*
 # Uploaded files
 uploads/
 
-backend/ai-model/
+ai-model/
+*.pt
+*.onnx
+*.weights
 
 # IDE files
 .vscode/
