@@ -2007,6 +2007,46 @@ exports.getIncident = async (req, res, next) => {
 
 exports.createIncident = async (req, res, next) => {
   try {
+    // SECURITY: Validate location payload HMAC to prevent spoofing
+    const crypto = require('crypto');
+    const signature = req.headers['x-location-signature'];
+    
+    if (req.body.location) {
+      let loc = req.body.location;
+      if (typeof loc === 'string') {
+        try { loc = JSON.parse(loc); } catch(e) {}
+      }
+      
+      if (loc && loc.coordinates) {
+        if (!signature) {
+          console.warn('🚨 SECURITY ALERT: Missing location signature');
+          return res.status(403).json({
+            success: false,
+            message: 'Security validation failed: Missing location signature'
+          });
+        }
+        
+        let coordsStr = '';
+        if (typeof loc.coordinates === 'string') {
+          coordsStr = loc.coordinates.replace(/[\[\]\s]/g, '');
+        } else if (Array.isArray(loc.coordinates)) {
+          coordsStr = loc.coordinates.join(',');
+        }
+        
+        const secret = process.env.LOCATION_SECRET || 'khivision_production_location_key_2026';
+        const expectedSignature = crypto.createHmac('sha256', secret).update(coordsStr).digest('hex');
+          
+        if (signature !== expectedSignature) {
+          console.warn(`🚨 SECURITY ALERT: Location spoofing detected! Expected: ${expectedSignature}, Got: ${signature}`);
+          return res.status(403).json({
+            success: false,
+            message: 'Security validation failed: Location integrity compromised'
+          });
+        }
+        console.log('✅ Location integrity verified successfully');
+      }
+    }
+
     // Step 1: Set user
     req.body.reportedBy = req.user.id;
 
